@@ -20,6 +20,11 @@ docker compose exec -T app pytest -q
 - 5. 延迟闸门：`/latency`，`/api/latency`。
 - 6. 双写对账：`/parity`，`/api/parity`。
 - 7. 回补归档：`/backfills`，`/api/backfills`。
+- 发布范围裁决：`/release`，`/api/release/*`（增量批次 → 今日唯一在线范围）。
+
+## 发布裁决（增量不是全量）
+
+昨晚在线基线 + 今晚增量批次 + 延续依据三份输入，形成今日唯一在线范围：本批显式撤回（墓碑）不回流，迟到旧 upsert 被压制；本批 upsert 上线；未覆盖存量凭可复核延续依据才保留，否则阻断发布；同版本内容冲突阻断。任一阻断即冻结发布（确认返回 409），不做半发布。在线范围内容寻址生成 scope_sha256，同源重放幂等、成员不多不换；页面与证据导出共用同一裁决，三份来源 sha256 与源行号全部留痕。样例见 `sample_data/release/`。
 
 ## 核心规则
 

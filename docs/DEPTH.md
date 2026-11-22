@@ -13,6 +13,7 @@
 | M5 延迟闸门 | 查看并运行延迟闸门 | `/api/latency` | `app/modules/m5_latency/rules.py` | `tests/test_m5.py` |
 | M6 双写对账 | 查看并运行双写对账 | `/api/parity` | `app/modules/m6_parity/rules.py` | `tests/test_m6.py` |
 | M7 回补归档 | 查看并运行回补归档 | `/api/backfills` | `app/modules/m7_backfills/rules.py` | `tests/test_m7.py` |
+| 发布范围裁决 | 裁决今日唯一在线范围并发布 | `/release`、`/api/release/*` | `app/release/rules.py`、`app/release/service.py` | `tests/test_release_rules.py`、`tests/test_release_service.py` |
 
 ## 陷阱登记
 
@@ -30,6 +31,10 @@
 | TRAP-07 | 缺版本 | 当零处理 | 空值隔离 | `app/values.py` | `tests/test_m2.py::test_real_sentinel_isolated` |
 | TRAP-09 | 超大版本 | JSON精度损失 | 文本序列化 | `app/values.py` | `tests/test_m2.py::test_large_version_precise` |
 | TRAP-13 | 删除后迟到旧写 | 文档复活 | 最大版本墓碑 | `app/modules/m3_versions/rules.py` | `tests/test_m3.py::test_tombstone_beats_late_old_write` |
+| TRAP-30 | 增量当全量切换 | 正常存量被误删 | 未覆盖存量须有延续依据，否则阻断而非删除 | `app/release/rules.py` | `tests/test_release_rules.py::test_uncovered_without_basis_blocks` |
+| TRAP-31 | 漏送撤回文档沿用在线 | 已撤回正文继续露出 | 本批墓碑不回流，压制迟到旧 upsert | `app/release/rules.py` | `tests/test_release_rules.py::test_withdrawn_never_returns` |
+| TRAP-32 | 重放批次成员漂移 | 多次发布范围不一致 | 内容寻址 scope_sha256 + INSERT OR IGNORE 幂等 | `app/release/service.py` | `tests/test_release_service.py::test_idempotent_same_batch_same_release` |
+| TRAP-33 | 同版本内容冲突任选 | 不确定成员上线 | BATCH_CONFLICT 阻断，不任选 | `app/release/rules.py` | `tests/test_release_rules.py::test_same_version_conflict_blocks` |
 | TRAP-23 | 延迟阈值边界 | 多判延迟 | 等于阈值通过 | `app/modules/m5_latency/rules.py` | `tests/test_m5.py::test_threshold_equal_pass` |
 
 ## 对账规则

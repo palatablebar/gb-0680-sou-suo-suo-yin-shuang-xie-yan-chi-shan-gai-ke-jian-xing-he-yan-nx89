@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{title}} · 发布范围裁决</title>
+<link rel="stylesheet" href="/static/theme.css">
+<link rel="stylesheet" href="/static/layout.css">
+<link rel="stylesheet" href="/static/components.css">
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><span class="status-dot {{'' if result.releasable else 'mismatch'}}"></span>RELEASE / 发布裁决</div>
+    <nav>
+      <a href="/release" class="active"><span>今日在线范围</span><span>8</span></a>
+      <a href="/"><span>返回核验台</span><span>↩</span></a>
+    </nav>
+    <small>RELEASE {{result.release_id}}<br>RULE {{result.manifest.rule_version}}</small>
+  </aside>
+  <div class="work">
+    <header class="topbar">
+      <h1>发布范围裁决 · 今日唯一在线范围</h1>
+      <span class="status-dot {{'' if result.releasable else 'mismatch'}}"></span>
+      <span class="{{'mismatch' if not result.releasable else ''}}">
+        {{'可发布' if result.releasable else '阻断·冻结发布'}}
+      </span>
+      <a class="btn" href="/api/release/runs/{{result.release_id}}/archive">导出证据 CSV</a>
+    </header>
+    <main class="content">
+      <div class="kpis">
+        <div class="kpi">昨晚在线<b>{{result.metrics.baseline_online}}</b></div>
+        <div class="kpi">本批上线<b>{{result.metrics.batch_upsert}}</b></div>
+        <div class="kpi">撤回不回流<b>{{result.metrics.batch_withdrawn}}</b></div>
+        <div class="kpi">延续保留<b>{{result.metrics.carried_over}}</b></div>
+        <div class="kpi">阻断项<b class="{{'mismatch' if result.metrics.blocked else ''}}">{{result.metrics.blocked}}</b></div>
+        <div class="kpi">最终在线成员<b>{{result.metrics.online_members}}</b></div>
+      </div>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>逐文档裁决</h2>
+          <input id="doc-filter" placeholder="文档号 / 状态 / 依据" aria-label="筛选文档">
+        </div>
+        <div class="table-scroll">
+          <table class="version-ledger">
+            <thead><tr>
+              <th>文档号</th><th>版本</th><th>裁决</th><th>在线</th>
+              <th>来源</th><th>源行</th><th>判定依据 / 阻断原因</th>
+            </tr></thead>
+            <tbody id="doc-rows">
+            {% for d in result.decisions %}
+              <tr class="{{'mismatch' if not d.online and d.state!='BATCH_WITHDRAWN' else ''}} {{'deleted' if d.state=='BATCH_WITHDRAWN' else ''}}">
+                <td>{{d.doc_id}}</td>
+                <td>v{{d.version}}</td>
+                <td>{{state_labels.get(d.state,d.state)}}</td>
+                <td>{{'是' if d.online else '否'}}</td>
+                <td>{{'基线' if d.source=='baseline' else '增量'}}</td>
+                <td>{{d.source_lines|join(',')}}</td>
+                <td title="{{d.fingerprint}}">{{d.basis or d.detail or d.reason}}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="panel__head"><h2>今日在线范围（{{result.metrics.online_members}} 成员）</h2><span>指纹 {{result.scope_sha256[:12]}}…</span></div>
+          <div class="panel__body">
+            {% for m in result.online_scope %}
+            <div class="qrow"><b>{{m.doc_id}}</b> v{{m.version}} · {{state_labels.get(m.state,m.state)}} · {{'基线' if m.source=='baseline' else '增量'}} 行 {{m.source_lines|join(',')}}</div>
+            {% else %}<div class="empty">无在线成员。</div>{% endfor %}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel__head"><h2>阻断清单（{{result.metrics.blocked}}）</h2><span>{{'发布冻结' if not result.releasable else '无'}}</span></div>
+          <div class="panel__body">
+            {% for b in result.blocked %}
+            <div class="qrow mismatch"><b>{{b.doc_id}}</b> / {{state_labels.get(b.state,b.state)}} / {{b.detail or b.reason}}</div>
+            {% else %}<div class="empty">无阻断，可确认发布。</div>{% endfor %}
+          </div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="panel__head"><h2>来源留痕（可追回）</h2></div>
+        <div class="panel__body">
+          <div class="metric"><span>昨日基线 sha256</span><b style="word-break:break-all">{{result.manifest.baseline_input_sha256}}</b></div>
+          <div class="metric"><span>今晚增量 sha256</span><b style="word-break:break-all">{{result.manifest.batch_input_sha256}}</b></div>
+          <div class="metric"><span>延续依据 sha256</span><b style="word-break:break-all">{{result.manifest.continuity_input_sha256}}</b></div>
+          <div class="metric"><span>在线范围指纹 scope_sha256</span><b style="word-break:break-all">{{result.scope_sha256}}</b></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head"><h2>隔离输入（{{result.quarantine|length}}）</h2></div>
+        <div class="panel__body">
+          {% for q in result.quarantine %}
+          <div class="qrow">{{q.get('_line','—')}} / <b>{{q.reason}}</b> / {{q.detail}}</div>
+          {% else %}<div class="empty">无隔离输入。</div>{% endfor %}
+        </div>
+      </section>
+    </main>
+    <footer class="statusbar">
+      <span>{{result.release_id}} · {{result.manifest.generated_at[:19]}} UTC</span>
+      <span>页面与导出共用同一裁决 · scope {{result.scope_sha256[:16]}}…</span>
+    </footer>
+  </div>
+</div>
+<script>
+document.querySelector('#doc-filter')?.addEventListener('input',e=>{
+  for(const row of document.querySelectorAll('#doc-rows tr'))row.hidden=!row.textContent.includes(e.target.value);
+});
+</script>
+</body>
+</html>
